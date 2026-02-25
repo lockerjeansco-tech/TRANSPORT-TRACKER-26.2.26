@@ -36,29 +36,39 @@ export const Settings = () => {
 [System: Formula]
     ParcelTrackerURL: "${appUrl}/api/tally/check-lr"
 
-;; Define User Defined Fields (UDFs) to store data
+;; Define User Defined Fields (UDFs)
 [System: UDF]
     PT_LRNo: String: 1001
     PT_Status: String: 1002
     PT_Transport: String: 1003
     PT_Details: String: 1004
 
-;; Add fields to Purchase Voucher
+;; 1. Add Button to Right Toolbar
+[#Form: Purchase Color]
+    Add: Button: At End: PT_Check_Btn
+
+[Button: PT_Check_Btn]
+    Title: "Check Parcel Status"
+    Key: Alt + P
+    Action: Call: CheckParcelStatus
+    Color: Deep Blue
+
+;; 2. Add Fields above Narration
 [#Part: VCH Narration]
     Add: Line: Before: VCH Narration: PT_Header, PT_Row1, PT_Row2
 
 [Line: PT_Header]
     Field: Simple Field
-    Local: Field: Simple Field: Set as: "--- Parcel Tracker Integration ---"
+    Local: Field: Simple Field: Set as: "--- Parcel Tracker Details (Alt+P to Check) ---"
     Local: Field: Simple Field: Style: Small Bold
     Local: Field: Simple Field: Color: Deep Blue
     Local: Field: Simple Field: Skip: Yes
 
 [Line: PT_Row1]
-    Field: Short Prompt, PT_LR_Input, Short Prompt, PT_Status_Display
-    Local: Field: Short Prompt: Set as: "Check LR Number:"
-    Local: Field: Short Prompt: Width: 18
-    Local: Field: Short Prompt: Color: Blue
+    Field: Medium Prompt, PT_LR_Input, Medium Prompt, PT_Status_Display
+    Local: Field: Medium Prompt: Set as: "LR Number:"
+    Local: Field: Medium Prompt: Width: 15
+    Local: Field: Medium Prompt: Color: Blue
 
 [Field: PT_LR_Input]
     Use: Name Field
@@ -72,16 +82,17 @@ export const Settings = () => {
     Use: Name Field
     Storage: PT_Status
     Set as: if $$IsEmpty:$PT_Status then "Pending" else $PT_Status
-    Width: 20
+    Width: 25
     Color: if $PT_Status = "RECEIVED" then Green else Red
     Skip: Yes
     Border: Thin Box
+    Background: White
 
 [Line: PT_Row2]
-    Field: Short Prompt, PT_Transport_Display, Short Prompt, PT_Details_Display
-    Local: Field: Short Prompt: Set as: "Transport / Wgt:"
-    Local: Field: Short Prompt: Width: 18
-    Local: Field: Short Prompt: Color: Blue
+    Field: Medium Prompt, PT_Transport_Display, Medium Prompt, PT_Details_Display
+    Local: Field: Medium Prompt: Set as: "Transport:"
+    Local: Field: Medium Prompt: Width: 15
+    Local: Field: Medium Prompt: Color: Blue
 
 [Field: PT_Transport_Display]
     Use: Name Field
@@ -90,14 +101,16 @@ export const Settings = () => {
     Width: 20
     Skip: Yes
     Border: Thin Box
+    Background: White
 
 [Field: PT_Details_Display]
     Use: Name Field
     Storage: PT_Details
     Set as: $PT_Details
-    Width: 20
+    Width: 25
     Skip: Yes
     Border: Thin Box
+    Background: White
 
 [Function: CheckParcelStatus]
     Variable: LRNum: String
@@ -105,28 +118,44 @@ export const Settings = () => {
     Variable: StatusPart: String
     Variable: TransPart: String
     Variable: WeightPart: String
-    00: Set: LRNum: $$Value
-    10: If: $$IsEmpty: ##LRNum
-    20:     Return
-    30: End If
-    40: Set: ServerResponse: $$FetchUrl:@@ParcelTrackerURL + "?lr=" + ##LRNum + "&format=text"
     
-    ;; Parse Pipe Delimited String: STATUS|TRANSPORT|WEIGHT|AMOUNT
-    50: Set: StatusPart: $$StringPart:##ServerResponse:0:"|"
-    60: Set: TransPart: $$StringPart:##ServerResponse:1:"|"
-    70: Set: WeightPart: $$StringPart:##ServerResponse:2:"|"
+    ;; Get LR Number from field or prompt user if empty
+    00: Set: LRNum: $PT_LRNo
+    10: If: $$IsEmpty: ##LRNum
+    20:     Query Box: "Enter LR Number": Yes: No
+    30:     If: $$LastResult
+    40:         Set: LRNum: $$EditData
+    50:         Field Set: PT_LR_Input: ##LRNum
+    60:     Else
+    70:         Return
+    80:     End If
+    90: End If
 
-    80: If: ##StatusPart = "RECEIVED"
-    90:     Field Set: PT_Status_Display: "RECEIVED"
-    100:    Field Set: PT_Transport_Display: ##TransPart
-    110:    Field Set: PT_Details_Display: ##WeightPart
-    120:    Msg Box: "Status: RECEIVED": "✅ Parcel Found! Transport: " + ##TransPart
-    130: Else
-    140:    Field Set: PT_Status_Display: "NOT RECEIVED"
-    150:    Field Set: PT_Transport_Display: "Unknown"
-    160:    Field Set: PT_Details_Display: "Unknown"
-    170:    Msg Box: "Status: NOT RECEIVED": "❌ WARNING: Parcel NOT found in tracker!"
-    180: End If
+    100: Msg Box: "Checking...": "Connecting to Parcel Tracker..."
+    110: Set: ServerResponse: $$FetchUrl:@@ParcelTrackerURL + "?lr=" + ##LRNum + "&format=text"
+    
+    ;; Parse Response: STATUS|TRANSPORT|WEIGHT|AMOUNT
+    120: Set: StatusPart: $$StringPart:##ServerResponse:0:"|"
+    130: Set: TransPart: $$StringPart:##ServerResponse:1:"|"
+    140: Set: WeightPart: $$StringPart:##ServerResponse:2:"|"
+
+    150: If: ##StatusPart = "RECEIVED"
+    160:    Field Set: PT_Status_Display: "RECEIVED"
+    170:    Field Set: PT_Transport_Display: ##TransPart
+    180:    Field Set: PT_Details_Display: ##WeightPart
+    190:    Set: PT_Status: "RECEIVED"
+    200:    Set: PT_Transport: ##TransPart
+    210:    Set: PT_Details: ##WeightPart
+    220:    Msg Box: "Success": "✅ Parcel Found! Status: RECEIVED"
+    230: Else
+    240:    Field Set: PT_Status_Display: "NOT RECEIVED"
+    250:    Field Set: PT_Transport_Display: "Unknown"
+    260:    Field Set: PT_Details_Display: "Unknown"
+    270:    Set: PT_Status: "NOT RECEIVED"
+    280:    Set: PT_Transport: "Unknown"
+    290:    Set: PT_Details: "Unknown"
+    300:    Msg Box: "Not Found": "❌ Parcel NOT Found or Not Received."
+    310: End If
 `;
     
     const blob = new Blob([tdlContent], { type: 'text/plain' });
