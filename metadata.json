@@ -1,0 +1,5 @@
+{
+  "name": "Remix: Transport Parcel Tracker",
+  "description": "Advanced transport parcel tracking system with LR management, party management, financial tracking, and role-based access control.",
+  "requestFramePermissions": []
+}
