@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { lr } = req.query;
+    const { lr, format } = req.query;
 
     if (!lr) {
       return res.status(400).json({ error: "LR Number is required" });
@@ -47,6 +47,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!snapshot.empty) {
       const doc = snapshot.docs[0];
       const data = doc.data();
+      
+      if (format === 'text') {
+        // Format: STATUS|TRANSPORT|WEIGHT|AMOUNT
+        return res.send(`RECEIVED|${data.transport || 'Unknown'}|${data.weight || '0'}kg|${data.totalAmount || '0'}`);
+      }
+
       return res.json({
         found: true,
         status: "received",
@@ -60,6 +66,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       });
     } else {
+      if (format === 'text') {
+        return res.send("NOT_RECEIVED|||");
+      }
+
       return res.json({
         found: false,
         status: "not_received",

@@ -36,36 +36,97 @@ export const Settings = () => {
 [System: Formula]
     ParcelTrackerURL: "${appUrl}/api/tally/check-lr"
 
-;; Add a field to the Purchase Voucher to check LR
+;; Define User Defined Fields (UDFs) to store data
+[System: UDF]
+    PT_LRNo: String: 1001
+    PT_Status: String: 1002
+    PT_Transport: String: 1003
+    PT_Details: String: 1004
+
+;; Add fields to Purchase Voucher
 [#Part: VCH Narration]
-    Add: Line: Before: VCH Narration: ParcelTrackerInfo
+    Add: Line: Before: VCH Narration: PT_Header, PT_Row1, PT_Row2
 
-[Line: ParcelTrackerInfo]
-    Field: Short Prompt, PT LR Number
+[Line: PT_Header]
+    Field: Simple Field
+    Local: Field: Simple Field: Set as: "--- Parcel Tracker Integration ---"
+    Local: Field: Simple Field: Style: Small Bold
+    Local: Field: Simple Field: Color: Deep Blue
+    Local: Field: Simple Field: Skip: Yes
+
+[Line: PT_Row1]
+    Field: Short Prompt, PT_LR_Input, Short Prompt, PT_Status_Display
     Local: Field: Short Prompt: Set as: "Check LR Number:"
-    Local: Field: PT LR Number: Set as: ""
+    Local: Field: Short Prompt: Width: 18
+    Local: Field: Short Prompt: Color: Blue
 
-[Field: PT LR Number]
+[Field: PT_LR_Input]
     Use: Name Field
+    Storage: PT_LRNo
     Width: 20
     Border: Thin Box
     Background: White
     On: Accept: Call: CheckParcelStatus
 
+[Field: PT_Status_Display]
+    Use: Name Field
+    Storage: PT_Status
+    Set as: if $$IsEmpty:$PT_Status then "Pending" else $PT_Status
+    Width: 20
+    Color: if $PT_Status = "RECEIVED" then Green else Red
+    Skip: Yes
+    Border: Thin Box
+
+[Line: PT_Row2]
+    Field: Short Prompt, PT_Transport_Display, Short Prompt, PT_Details_Display
+    Local: Field: Short Prompt: Set as: "Transport / Wgt:"
+    Local: Field: Short Prompt: Width: 18
+    Local: Field: Short Prompt: Color: Blue
+
+[Field: PT_Transport_Display]
+    Use: Name Field
+    Storage: PT_Transport
+    Set as: $PT_Transport
+    Width: 20
+    Skip: Yes
+    Border: Thin Box
+
+[Field: PT_Details_Display]
+    Use: Name Field
+    Storage: PT_Details
+    Set as: $PT_Details
+    Width: 20
+    Skip: Yes
+    Border: Thin Box
+
 [Function: CheckParcelStatus]
     Variable: LRNum: String
     Variable: ServerResponse: String
+    Variable: StatusPart: String
+    Variable: TransPart: String
+    Variable: WeightPart: String
     00: Set: LRNum: $$Value
     10: If: $$IsEmpty: ##LRNum
     20:     Return
     30: End If
-    40: Set: ServerResponse: $$FetchUrl:@@ParcelTrackerURL + "?lr=" + ##LRNum
-    50: ;; Simple string check for reliability
-    60: If: $$StringContains:##ServerResponse:"\"found\":true"
-    70:     Msg Box: "Status: RECEIVED": "✅ This parcel is marked as RECEIVED in Parcel Tracker."
-    80: Else
-    90:     Msg Box: "Status: NOT RECEIVED": "❌ WARNING: This LR Number was NOT found in Parcel Tracker!"
-    100: End If
+    40: Set: ServerResponse: $$FetchUrl:@@ParcelTrackerURL + "?lr=" + ##LRNum + "&format=text"
+    
+    ;; Parse Pipe Delimited String: STATUS|TRANSPORT|WEIGHT|AMOUNT
+    50: Set: StatusPart: $$StringPart:##ServerResponse:0:"|"
+    60: Set: TransPart: $$StringPart:##ServerResponse:1:"|"
+    70: Set: WeightPart: $$StringPart:##ServerResponse:2:"|"
+
+    80: If: ##StatusPart = "RECEIVED"
+    90:     Field Set: PT_Status_Display: "RECEIVED"
+    100:    Field Set: PT_Transport_Display: ##TransPart
+    110:    Field Set: PT_Details_Display: ##WeightPart
+    120:    Msg Box: "Status: RECEIVED": "✅ Parcel Found! Transport: " + ##TransPart
+    130: Else
+    140:    Field Set: PT_Status_Display: "NOT RECEIVED"
+    150:    Field Set: PT_Transport_Display: "Unknown"
+    160:    Field Set: PT_Details_Display: "Unknown"
+    170:    Msg Box: "Status: NOT RECEIVED": "❌ WARNING: Parcel NOT found in tracker!"
+    180: End If
 `;
     
     const blob = new Blob([tdlContent], { type: 'text/plain' });
