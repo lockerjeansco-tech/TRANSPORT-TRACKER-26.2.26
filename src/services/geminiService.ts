@@ -1,6 +1,19 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Lazy initialization to prevent crash if API key is missing
+let ai: GoogleGenAI | null = null;
+
+const getAI = () => {
+  if (!ai) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.warn("Gemini API Key is missing. AI features will be disabled.");
+      return null;
+    }
+    ai = new GoogleGenAI({ apiKey });
+  }
+  return ai;
+};
 
 export interface ExtractedParcelData {
   lrNumber?: string;
@@ -12,6 +25,11 @@ export interface ExtractedParcelData {
 
 export const extractParcelDataFromImage = async (file: File): Promise<ExtractedParcelData> => {
   try {
+    const aiClient = getAI();
+    if (!aiClient) {
+      throw new Error("Gemini API Key is not configured.");
+    }
+
     // Convert file to base64
     const base64Data = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -25,7 +43,7 @@ export const extractParcelDataFromImage = async (file: File): Promise<ExtractedP
       reader.readAsDataURL(file);
     });
 
-    const model = "gemini-flash-latest";
+    const model = "gemini-2.5-flash-latest"; // Updated model name
     const prompt = `
       Analyze this image of a transport receipt or LR (Lorry Receipt).
       Extract the following information in JSON format:
@@ -39,7 +57,7 @@ export const extractParcelDataFromImage = async (file: File): Promise<ExtractedP
       Return ONLY the JSON object, no markdown formatting.
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await aiClient.models.generateContent({
       model: model,
       contents: {
         parts: [

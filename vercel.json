@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/api/tally/check-lr", "destination": "/api/tally/check-lr" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
