@@ -53,6 +53,9 @@ export const Entry = () => {
   const [weightImagePreview, setWeightImagePreview] = useState<string | null>(null);
   const [lastSavedParcel, setLastSavedParcel] = useState<any | null>(null);
 
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const handleStatusChange = () => setIsOffline(!navigator.onLine);
     window.addEventListener('online', handleStatusChange);
@@ -573,19 +576,15 @@ export const Entry = () => {
               </div>
 
               {/* Image Upload */}
-              <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:bg-slate-50 transition-colors relative group cursor-pointer">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                  onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
-                />
+              <div className="space-y-3">
+                <p className="block text-sm font-medium text-slate-700 mb-1">Weight Proof</p>
+                
                 {weightImagePreview ? (
-                  <div className="relative h-48 w-full">
+                  <div className="relative h-48 w-full border-2 border-slate-200 rounded-xl overflow-hidden bg-slate-50">
                     <img 
                       src={weightImagePreview} 
                       alt="Preview" 
-                      className="h-full w-full object-contain rounded-lg" 
+                      className="h-full w-full object-contain" 
                       referrerPolicy="no-referrer"
                     />
                     <button
@@ -595,18 +594,49 @@ export const Entry = () => {
                         setWeightImage(null);
                         setWeightImagePreview(null);
                       }}
-                      className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full z-20 hover:bg-red-600 transition-colors"
+                      className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full z-20 hover:bg-red-600 transition-colors shadow-sm"
                     >
                       <X size={16} />
                     </button>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center">
-                    <div className="p-4 bg-indigo-50 text-indigo-500 rounded-full mb-3 group-hover:scale-110 transition-transform">
-                      <Camera size={32} />
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Camera Button */}
+                    <div 
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center text-center hover:bg-indigo-50 hover:border-indigo-300 transition-all cursor-pointer group h-32 active:scale-95 transform duration-100"
+                    >
+                      <input
+                        ref={cameraInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
+                      />
+                      <div className="p-3 bg-indigo-100 text-indigo-600 rounded-full mb-2 group-hover:scale-110 transition-transform shadow-sm">
+                        <Camera size={24} />
+                      </div>
+                      <p className="font-medium text-slate-900 text-sm">Take Photo</p>
                     </div>
-                    <p className="font-medium text-slate-900">Upload Weight Proof</p>
-                    <p className="text-sm text-slate-500">Click or drag and drop</p>
+
+                    {/* Gallery Button */}
+                    <div 
+                      onClick={() => galleryInputRef.current?.click()}
+                      className="border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center text-center hover:bg-indigo-50 hover:border-indigo-300 transition-all cursor-pointer group h-32 active:scale-95 transform duration-100"
+                    >
+                      <input
+                        ref={galleryInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
+                      />
+                      <div className="p-3 bg-indigo-100 text-indigo-600 rounded-full mb-2 group-hover:scale-110 transition-transform shadow-sm">
+                        <Upload size={24} />
+                      </div>
+                      <p className="font-medium text-slate-900 text-sm">Upload File</p>
+                    </div>
                   </div>
                 )}
               </div>
