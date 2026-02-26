@@ -32,12 +32,12 @@ export const Settings = () => {
     const appUrl = window.location.origin;
     const tdlContent = `;; ============================================================
 ;; PARCEL TRACKER INTEGRATION FOR TALLY PRIME
-;; Version: 8.1 (Auto-Fetch Fix)
+;; Version: 8.2 (Format Fix)
 ;;
 ;; FIXES:
-;; 1. Uses $$EditData to capture LR Number immediately upon typing.
-;; 2. Updates the Status Field visibly using 'Field Set'.
-;; 3. Added a manual 'Check Status' button as a backup.
+;; 1. Added "&format=text" to API URL (CRITICAL: Server was returning JSON).
+;; 2. Switched to $$Value to capture LR Number reliably.
+;; 3. Changed default status text to "Ready" to avoid confusion.
 ;; ============================================================
 
 ;; ============================================================
@@ -159,7 +159,7 @@ export const Settings = () => {
 [Field: SVP_StatusField]
     Use        : Name Field
     Storage    : SVParcelStatus
-    Set as     : if $$IsEmpty:$SVParcelStatus then "Pending..." else $SVParcelStatus
+    Set as     : if $$IsEmpty:$SVParcelStatus then "Ready" else $SVParcelStatus
     Width      : 40
     Skip       : Yes
     Style      : "Medium Bold"
@@ -169,7 +169,7 @@ export const Settings = () => {
 ;; SECTION 4: LR CHECK FUNCTIONS
 ;; ============================================================
 
-;; Function triggered when typing in the field (uses $$EditData)
+;; Function triggered when typing in the field
 [Function: Func_CheckLROnAccept]
     Variable : vLR   : String
     Variable : vResp : String
@@ -177,8 +177,8 @@ export const Settings = () => {
     Variable : vDet  : String
     Variable : vURL  : String
 
-    ;; Capture what the user just typed
-    00 : Set : vLR   : $$EditData
+    ;; Capture what the user just typed using $$Value (Current Field Value)
+    00 : Set : vLR   : $$Value
     
     10 : If  : $$IsEmpty:##vLR
     20 :     Set : SVParcelStatus : "Enter LR Number"
@@ -189,7 +189,8 @@ export const Settings = () => {
     ;; Show loading state
     60 : Field Set : SVP_StatusField : "Checking..."
 
-    70 : Set : vURL  : @@ParcelTrackerURL + "?lr=" + ##vLR
+    ;; CRITICAL FIX: Added &format=text to ensure pipe-separated response
+    70 : Set : vURL  : @@ParcelTrackerURL + "?lr=" + ##vLR + "&format=text"
     80 : Set : vResp : $$HTTP_GET:##vURL
     
     90 : If  : $$IsEmpty:##vResp
@@ -227,7 +228,7 @@ export const Settings = () => {
     40 : End If
 
     50 : Msg Box : "Status" : "Checking Server..."
-    60 : Set : vURL  : @@ParcelTrackerURL + "?lr=" + ##vLR
+    60 : Set : vURL  : @@ParcelTrackerURL + "?lr=" + ##vLR + "&format=text"
     70 : Set : vResp : $$HTTP_GET:##vURL
     
     80 : If  : $$IsEmpty:##vResp
@@ -391,7 +392,7 @@ export const Settings = () => {
     40 :     Set : PT_CheckDetail : ""
     50 :     Return
     60 : End If
-    70 : Set : vURL  : @@ParcelTrackerURL + "?lr=" + ##vLR
+    70 : Set : vURL  : @@ParcelTrackerURL + "?lr=" + ##vLR + "&format=text"
     80 : Set : vResp : $$HTTP_GET:##vURL
     90 : If  : $$IsEmpty:##vResp
    100 :     Set : PT_CheckStatus : "NOT RECEIVED"
@@ -591,7 +592,7 @@ export const Settings = () => {
     Skip   : Yes
 
 ;; ============================================================
-;; END OF TDL - ParcelTracker v8.1 FINAL
+;; END OF TDL - ParcelTracker v8.2 FINAL
 ;; ============================================================
 `;
     
