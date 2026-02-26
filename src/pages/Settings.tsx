@@ -43,72 +43,71 @@ export const Settings = () => {
     PT_Transport: String: 1003
     PT_Details: String: 1004
 
-;; 1. Add Button to Right Toolbar
+;; Add a dedicated Part at the bottom of Purchase Voucher
 [#Form: Purchase Color]
-    Add: Button: At End: PT_Check_Btn
+    Add: Part: After: VCH Narration: PT_Container
+    Add: Button: At End: PT_Check_Button
 
-[Button: PT_Check_Btn]
-    Title: "Check Parcel Status"
-    Key: Alt + P
+;; Button Definition (Using Ctrl+Alt+P to avoid Print conflict)
+[Button: PT_Check_Button]
+    Title: "Check Parcel"
+    Key: Ctrl + Alt + P
     Action: Call: CheckParcelStatus
     Color: Deep Blue
 
-;; 2. Add Fields above Narration
-[#Part: VCH Narration]
-    Add: Line: Before: VCH Narration: PT_Header, PT_Row1, PT_Row2
+;; Container Part
+[Part: PT_Container]
+    Line: PT_Title_Line, PT_Input_Line, PT_Result_Line
+    Border: Thin Box
+    Space Top: 1
+    Background: White
 
-[Line: PT_Header]
+[Line: PT_Title_Line]
     Field: Simple Field
-    Local: Field: Simple Field: Set as: "--- Parcel Tracker Details (Alt+P to Check) ---"
+    Local: Field: Simple Field: Set as: "PARCEL TRACKER INTEGRATION"
     Local: Field: Simple Field: Style: Small Bold
     Local: Field: Simple Field: Color: Deep Blue
+    Local: Field: Simple Field: Full Width: Yes
+    Local: Field: Simple Field: Align: Center
     Local: Field: Simple Field: Skip: Yes
 
-[Line: PT_Row1]
-    Field: Medium Prompt, PT_LR_Input, Medium Prompt, PT_Status_Display
-    Local: Field: Medium Prompt: Set as: "LR Number:"
-    Local: Field: Medium Prompt: Width: 15
+[Line: PT_Input_Line]
+    Field: Medium Prompt, PT_LR_Field
+    Local: Field: Medium Prompt: Set as: "Enter LR Number:"
+    Local: Field: Medium Prompt: Width: 20
     Local: Field: Medium Prompt: Color: Blue
 
-[Field: PT_LR_Input]
+[Field: PT_LR_Field]
     Use: Name Field
     Storage: PT_LRNo
-    Width: 20
+    Width: 25
     Border: Thin Box
     Background: White
     On: Accept: Call: CheckParcelStatus
 
-[Field: PT_Status_Display]
+[Line: PT_Result_Line]
+    Field: Medium Prompt, PT_Status_Field, Medium Prompt, PT_Info_Field
+    Local: Field: Medium Prompt: Set as: "Status:"
+    Local: Field: Medium Prompt: Width: 10
+    Local: Field: Medium Prompt: Color: Blue
+
+[Field: PT_Status_Field]
     Use: Name Field
     Storage: PT_Status
     Set as: if $$IsEmpty:$PT_Status then "Pending" else $PT_Status
-    Width: 25
     Color: if $PT_Status = "RECEIVED" then Green else Red
+    Width: 15
     Skip: Yes
     Border: Thin Box
     Background: White
 
-[Line: PT_Row2]
-    Field: Medium Prompt, PT_Transport_Display, Medium Prompt, PT_Details_Display
-    Local: Field: Medium Prompt: Set as: "Transport:"
-    Local: Field: Medium Prompt: Width: 15
-    Local: Field: Medium Prompt: Color: Blue
-
-[Field: PT_Transport_Display]
-    Use: Name Field
-    Storage: PT_Transport
-    Set as: $PT_Transport
-    Width: 20
-    Skip: Yes
-    Border: Thin Box
-    Background: White
-
-[Field: PT_Details_Display]
+[Field: PT_Info_Field]
     Use: Name Field
     Storage: PT_Details
     Set as: $PT_Details
-    Width: 25
+    Width: 40
     Skip: Yes
+    Style: Small Italic
     Border: Thin Box
     Background: White
 
@@ -119,13 +118,13 @@ export const Settings = () => {
     Variable: TransPart: String
     Variable: WeightPart: String
     
-    ;; Get LR Number from field or prompt user if empty
+    ;; Get LR Number from field
     00: Set: LRNum: $PT_LRNo
     10: If: $$IsEmpty: ##LRNum
     20:     Query Box: "Enter LR Number": Yes: No
     30:     If: $$LastResult
     40:         Set: LRNum: $$EditData
-    50:         Field Set: PT_LR_Input: ##LRNum
+    50:         Field Set: PT_LR_Field: ##LRNum
     60:     Else
     70:         Return
     80:     End If
@@ -140,22 +139,18 @@ export const Settings = () => {
     140: Set: WeightPart: $$StringPart:##ServerResponse:2:"|"
 
     150: If: ##StatusPart = "RECEIVED"
-    160:    Field Set: PT_Status_Display: "RECEIVED"
-    170:    Field Set: PT_Transport_Display: ##TransPart
-    180:    Field Set: PT_Details_Display: ##WeightPart
-    190:    Set: PT_Status: "RECEIVED"
-    200:    Set: PT_Transport: ##TransPart
-    210:    Set: PT_Details: ##WeightPart
-    220:    Msg Box: "Success": "✅ Parcel Found! Status: RECEIVED"
-    230: Else
-    240:    Field Set: PT_Status_Display: "NOT RECEIVED"
-    250:    Field Set: PT_Transport_Display: "Unknown"
-    260:    Field Set: PT_Details_Display: "Unknown"
-    270:    Set: PT_Status: "NOT RECEIVED"
-    280:    Set: PT_Transport: "Unknown"
-    290:    Set: PT_Details: "Unknown"
-    300:    Msg Box: "Not Found": "❌ Parcel NOT Found or Not Received."
-    310: End If
+    160:    Field Set: PT_Status_Field: "RECEIVED"
+    170:    Field Set: PT_Info_Field: ##TransPart + " (" + ##WeightPart + ")"
+    180:    Set: PT_Status: "RECEIVED"
+    190:    Set: PT_Details: ##TransPart + " (" + ##WeightPart + ")"
+    200:    Msg Box: "Success": "✅ Parcel Found! Status: RECEIVED"
+    210: Else
+    220:    Field Set: PT_Status_Field: "NOT RECEIVED"
+    230:    Field Set: PT_Info_Field: "Unknown"
+    240:    Set: PT_Status: "NOT RECEIVED"
+    250:    Set: PT_Details: "Unknown"
+    260:    Msg Box: "Not Found": "❌ Parcel NOT Found or Not Received."
+    270: End If
 `;
     
     const blob = new Blob([tdlContent], { type: 'text/plain' });
