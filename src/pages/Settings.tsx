@@ -32,17 +32,12 @@ export const Settings = () => {
     const appUrl = window.location.origin;
     const tdlContent = `;; ============================================================
 ;; PARCEL TRACKER INTEGRATION FOR TALLY PRIME
-;; Version: 8.0 FINAL - Based on Official Tally Help Documentation
+;; Version: 8.1 (Auto-Fetch Fix)
 ;;
-;; VERIFIED RULES FROM TALLY OFFICIAL DOCS:
-;; 1. Color on Field = "Background" attribute, NOT "Color"
-;; 2. Conditional Background = Background : if cond then ColorA else ColorB
-;; 3. Style values must be quoted strings e.g. "Normal Bold" "Large Bold"
-;; 4. Width/Height on Form = integer numbers only (no %)
-;; 5. Filter on Collection, NOT on Part
-;; 6. Style/Background/Align/Skip/Width on Field ONLY
-;; 7. Border/Active/Space on Part ONLY
-;; 8. Purchase voucher form = "Purchase Color"
+;; FIXES:
+;; 1. Uses $$EditData to capture LR Number immediately upon typing.
+;; 2. Updates the Status Field visibly using 'Field Set'.
+;; 3. Added a manual 'Check Status' button as a backup.
 ;; ============================================================
 
 ;; ============================================================
@@ -67,12 +62,12 @@ export const Settings = () => {
 
 ;; ============================================================
 ;; SECTION 3: ADD PARCEL SECTION TO PURCHASE VOUCHER
-;;            Purchase voucher form name = "Purchase Color"
 ;; ============================================================
 
 [#Form: Purchase Color]
     Add : Part   : SVParcelInfoPart
     Add : Button : PT_VoucherButton
+    Add : Button : PT_ManualCheckBtn
 
 [Part: SVParcelInfoPart]
     Line   : SVP_TitleLine
@@ -134,7 +129,8 @@ export const Settings = () => {
     Storage    : SVLRNumber
     Width      : 30
     Modifiable : Yes
-    On         : Accept : Call : Func_CheckLROnVoucher
+    ;; IMPORTANT: Trigger check immediately when user presses Enter
+    On         : Accept : Call : Func_CheckLROnAccept
 
 ;; Total Parcels
 [Line: SVP_ParcelsLine]
@@ -151,7 +147,7 @@ export const Settings = () => {
     Width      : 10
     Modifiable : Yes
 
-;; Parcel Status (auto-filled, read-only)
+;; Parcel Status
 [Line: SVP_StatusLine]
     Field  : SVP_StatusPrompt
     Field  : SVP_StatusField
@@ -163,44 +159,111 @@ export const Settings = () => {
 [Field: SVP_StatusField]
     Use        : Name Field
     Storage    : SVParcelStatus
+    Set as     : if $$IsEmpty:$SVParcelStatus then "Pending..." else $SVParcelStatus
     Width      : 40
     Skip       : Yes
     Style      : "Medium Bold"
+    Color      : Deep Blue
 
 ;; ============================================================
-;; SECTION 4: LR CHECK FUNCTION (triggered on LR field accept)
+;; SECTION 4: LR CHECK FUNCTIONS
 ;; ============================================================
 
-[Function: Func_CheckLROnVoucher]
+;; Function triggered when typing in the field (uses $$EditData)
+[Function: Func_CheckLROnAccept]
     Variable : vLR   : String
     Variable : vResp : String
     Variable : vStat : String
     Variable : vDet  : String
     Variable : vURL  : String
 
-    10 : Set : vLR   : $SVLRNumber
-    20 : If  : $$IsEmpty:##vLR
-    30 :     Set : SVParcelStatus : "Enter LR Number first"
+    ;; Capture what the user just typed
+    00 : Set : vLR   : $$EditData
+    
+    10 : If  : $$IsEmpty:##vLR
+    20 :     Set : SVParcelStatus : "Enter LR Number"
+    30 :     Field Set : SVP_StatusField : "Enter LR Number"
     40 :     Return
     50 : End If
+
+    ;; Show loading state
+    60 : Field Set : SVP_StatusField : "Checking..."
+
+    70 : Set : vURL  : @@ParcelTrackerURL + "?lr=" + ##vLR
+    80 : Set : vResp : $$HTTP_GET:##vURL
+    
+    90 : If  : $$IsEmpty:##vResp
+   100 :     Set : SVParcelStatus : "Server Error / Offline"
+   110 :     Field Set : SVP_StatusField : "Server Error / Offline"
+   120 :     Return
+   130 : End If
+
+   140 : Set : vStat : $$StrByChar:##vResp:0:$$StrFindChar:##vResp:"|"
+   150 : Set : vDet  : $$StrByChar:##vResp:$$($$StrFindChar:##vResp:"|"+1):$$StrLen:##vResp
+   
+   160 : If  : ##vStat = "RECEIVED"
+   170 :     Set : SVParcelStatus : "RECEIVED - " + ##vDet
+   180 :     Field Set : SVP_StatusField : "RECEIVED - " + ##vDet
+   190 : Else
+   200 :     Set : SVParcelStatus : "NOT RECEIVED"
+   210 :     Field Set : SVP_StatusField : "NOT RECEIVED"
+   220 : End If
+    Return
+
+;; Function triggered by Manual Button (uses stored $SVLRNumber)
+[Function: Func_ManualCheck]
+    Variable : vLR   : String
+    Variable : vResp : String
+    Variable : vStat : String
+    Variable : vDet  : String
+    Variable : vURL  : String
+
+    ;; Capture from storage
+    00 : Set : vLR   : $SVLRNumber
+    
+    10 : If  : $$IsEmpty:##vLR
+    20 :     Msg Box : "Error" : "Please enter an LR Number first."
+    30 :     Return
+    40 : End If
+
+    50 : Msg Box : "Status" : "Checking Server..."
     60 : Set : vURL  : @@ParcelTrackerURL + "?lr=" + ##vLR
     70 : Set : vResp : $$HTTP_GET:##vURL
+    
     80 : If  : $$IsEmpty:##vResp
-    90 :     Set : SVParcelStatus : "NOT RECEIVED - Server unreachable"
-   100 :     Return
-   110 : End If
-   120 : Set : vStat : $$StrByChar:##vResp:0:$$StrFindChar:##vResp:"|"
-   130 : Set : vDet  : $$StrByChar:##vResp:$$($$StrFindChar:##vResp:"|"+1):$$StrLen:##vResp
-   140 : If  : ##vStat = "RECEIVED"
-   150 :     Set : SVParcelStatus : "RECEIVED - " + ##vDet
-   160 : Else
-   170 :     Set : SVParcelStatus : "NOT RECEIVED"
-   180 : End If
+    90 :     Set : SVParcelStatus : "Server Error / Offline"
+   100 :     Field Set : SVP_StatusField : "Server Error / Offline"
+   110 :     Return
+   120 : End If
+
+   130 : Set : vStat : $$StrByChar:##vResp:0:$$StrFindChar:##vResp:"|"
+   140 : Set : vDet  : $$StrByChar:##vResp:$$($$StrFindChar:##vResp:"|"+1):$$StrLen:##vResp
+   
+   150 : If  : ##vStat = "RECEIVED"
+   160 :     Set : SVParcelStatus : "RECEIVED - " + ##vDet
+   170 :     Field Set : SVP_StatusField : "RECEIVED - " + ##vDet
+   180 :     Msg Box : "Success" : "Parcel is RECEIVED!"
+   190 : Else
+   200 :     Set : SVParcelStatus : "NOT RECEIVED"
+   210 :     Field Set : SVP_StatusField : "NOT RECEIVED"
+   220 :     Msg Box : "Info" : "Parcel NOT Received yet."
+   230 : End If
     Return
 
 ;; ============================================================
-;; SECTION 5: MENU ITEMS + HOTKEY + VOUCHER BUTTON
+;; SECTION 5: BUTTONS & MENUS
 ;; ============================================================
+
+[Button: PT_ManualCheckBtn]
+    Title  : "Check Status (Manual)"
+    Key    : Alt + C
+    Action : Call : Func_ManualCheck
+    Color  : Deep Blue
+
+[Button: PT_VoucherButton]
+    Title  : "Open Tracker (Pop-up)"
+    Key    : Ctrl + Alt + P
+    Action : Display : Rpt_ParcelChecker
 
 [Key: PT_GlobalHotKey]
     Key    : Ctrl + Alt + P
@@ -210,13 +273,8 @@ export const Settings = () => {
     Add : Item : "Parcel Status Checker" : Display : Rpt_ParcelChecker
     Add : Item : "Not Received Parcels"  : Display : Rpt_NotReceived
 
-[Button: PT_VoucherButton]
-    Title  : "Check Parcel"
-    Key    : Ctrl + Alt + P
-    Action : Display : Rpt_ParcelChecker
-
 ;; ============================================================
-;; SECTION 6: STANDALONE LR CHECKER POPUP REPORT
+;; SECTION 6: STANDALONE POPUP (Unchanged)
 ;; ============================================================
 
 [Report: Rpt_ParcelChecker]
@@ -319,10 +377,6 @@ export const Settings = () => {
     Align  : Centre
     Width  : 60
     Skip   : Yes
-
-;; ============================================================
-;; SECTION 7: STANDALONE CHECKER FUNCTION
-;; ============================================================
 
 [Function: Func_StandaloneCheck]
     Variable : vLR   : String
@@ -537,7 +591,7 @@ export const Settings = () => {
     Skip   : Yes
 
 ;; ============================================================
-;; END OF TDL - ParcelTracker v8.0 FINAL
+;; END OF TDL - ParcelTracker v8.1 FINAL
 ;; ============================================================
 `;
     
